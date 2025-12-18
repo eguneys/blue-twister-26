@@ -2,7 +2,7 @@ import './style.css'
 import { Loop } from "./loop"
 import * as simulate from './simulation2'
 import { audio } from "./simulation2"
-import { drag, Init_canvas, type InitCanvas } from './webgl/canvas'
+import { Init_canvas } from './webgl/canvas'
 
 type Scene = {
     _init(): void
@@ -58,8 +58,6 @@ function _update(delta: number) {
     if (next !== undefined) {
         switch_to_scene(Scenes[next])
     }
-
-    drag.update(delta)
 }
 
 function _render() {
@@ -74,22 +72,16 @@ function _after_render() {
 
 function _cleanup() {
     current_scene._cleanup()
-    init_canvas.cleanup()
 }
-
-let init_canvas: InitCanvas
 
 export async function main(el: HTMLElement) {
 
-    init_canvas  = Init_canvas()
-    let canvas = init_canvas.canvas
-    canvas.classList.add('interactive')
-    let $content = document.createElement('div')
-    $content.classList.add('content')
-    $content.appendChild(canvas)
-    el.appendChild($content)
+    let { batch } = Init_canvas(el, _render)
 
     await audio.load()
+
+    simulate._set_ctx(batch)
+
     _init()
 
     let cleanup_loop = Loop(_update, _render, _after_render)

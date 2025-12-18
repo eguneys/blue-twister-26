@@ -1,11 +1,10 @@
 import type { SceneName } from "./main"
-import { batch } from "./webgl/canvas"
 //import { hitbox_rect } from "./simulation"
 import { colors } from './colors_in_gl'
 import type { Rect } from "./math/rect"
 import { AudioContent } from "./audio/audio"
-import { rotateVec2, vec2, type Vec2 } from "./math/vec2"
-import type { AnimChannel } from "./anim"
+import { rotateVec2, vec2 } from "./math/vec2"
+import type { BatchRenderer } from "./webgl/BatchRenderer"
 
 
 let is_muted: boolean
@@ -20,14 +19,6 @@ export function play_sfx(name: string) {
 
 let COLLISIONS = false
 //COLLISIONS = true
-
-
-let balls = []
-
-type Ball = {
-    xy: Vec2
-    follow: { x: AnimChannel, y: AnimChannel }
-}
 
 let time: number
 
@@ -49,14 +40,15 @@ export function _render() {
     batch.fillRect(1920/2, 1080/2, 1920, 1080, colors.darkblue)
 
     batch.fillRect(1920/2, 420, 1200 - 18, 800 - 18, colors.red)
-    batch.strokeRect(1920/2, 420, 1200 - 18, 800 - 18, 8, colors.darkred)
 
 
     let xy = vec2(0, 0)
     let w = 55
     let h = 80
 
-    let theta = Math.sin(time)
+    let theta = Math.sin(time * 0.1) * Math.PI * 2
+
+    xy = rotateVec2(vec2(100, 0), theta)
 
 
     //batch.fillRoundRect(1920/2 + xy.x, 420 + xy.y, w + 10, h + 20, 8, colors.darkred, theta)
@@ -137,6 +129,11 @@ export function hitbox_rect(box: Rect) {
     let h = box.wh.y
 
     batch.strokeRect(x + w / 2, y + h / 2, w, h, 7, colors.red)
+}
+
+let batch: BatchRenderer
+export function _set_ctx(set_batch: BatchRenderer) {
+    batch = set_batch
 }
 
 let set_next_scene: SceneName | undefined = undefined

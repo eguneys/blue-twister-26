@@ -1,5 +1,6 @@
 import VERT_SRC from './shape.vert'
 import FRAG_SRC from './shape.frag'
+import { projectionMatrix } from '../math/mat2';
 
 
 export class Renderer {
@@ -14,7 +15,8 @@ export class Renderer {
     instanceData: Float32Array;
     instanceCount: number = 0;
 
-    uResolution: WebGLUniformLocation | null;
+    //uResolution: WebGLUniformLocation | null;
+    uProjectionMatrix: WebGLUniformLocation | null;
 
     constructor(canvas: HTMLCanvasElement, maxInstances = 10_000) {
         const gl = canvas.getContext("webgl2", { antialias: true });
@@ -32,7 +34,8 @@ export class Renderer {
             FRAG_SRC
         );
 
-        this.uResolution = gl.getUniformLocation(this.program, "u_resolution");
+        //this.uResolution = gl.getUniformLocation(this.program, "u_resolution");
+        this.uProjectionMatrix = gl.getUniformLocation(this.program, "u_projection");
 
 
         // 36 floats per instance example (we will align later)
@@ -43,7 +46,10 @@ export class Renderer {
 
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
 
+    set_viewport(w: number, h: number) {
+        this.gl.viewport(0, 0, w, h)
     }
 
         private createVAO(): WebGLVertexArrayObject {
@@ -129,7 +135,8 @@ export class Renderer {
         gl.useProgram(this.program);
         gl.bindVertexArray(this.vao);
 
-        gl.uniform2f(this.uResolution, gl.canvas.width, gl.canvas.height);
+        //gl.uniform2f(this.uResolution, gl.canvas.width, gl.canvas.height);
+        gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
 
         // Upload only the needed part of the buffer
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceVBO);
