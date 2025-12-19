@@ -2,12 +2,13 @@ import type { SceneName } from "./main"
 import { colors, vibrant } from './colors_in_gl'
 import { box_intersect, rect, type Rect } from "./math/rect"
 import { AudioContent } from "./audio/audio"
-import { rotateVec2, vec2, type Vec2 } from "./math/vec2"
+import { add, fromAngle, mulScalar, rotateVec2, vec2, type Vec2 } from "./math/vec2"
 import type { BatchRenderer } from "./webgl/BatchRenderer"
-import { agent, ConvexPolygonBoundary, PathFollow, Seek, update_agent, Wander, WanderJitter, type Agent, type Boundary, type SteeringBehavior } from "./math/steer"
+import { agent, Arrive, ConvexPolygonBoundary, FlightAvoidance, PathFollow, Seek, update_agent, Wander, WanderJitter, type Agent, type Boundary, type SteeringBehavior } from "./math/steer"
 import type { DragHandler } from "./drag"
 import { poly_from_rect, type Poly } from "./math/polygon"
 import { AnimChannel } from "./anim"
+import type { Mesh } from "./mesh"
 
 
 let is_muted: boolean
@@ -37,6 +38,7 @@ type Car = {
 }
 
 let car: Car
+let car2: Car
 
 
 type Cursor = {
@@ -113,6 +115,40 @@ export function _init() {
         ]
     }
 
+    const car1_seek_target_provider = () => {
+        return add(car.xy, add(
+            mulScalar(fromAngle(Math.sin(time) * Math.PI), 10 + Math.random() * 10),
+            rotateVec2(vec2(-200, 0), car.theta)
+        ))
+    }
+
+    car2 = {
+        xy: vec2(),
+        theta: 0,
+        channels: {
+            theta: new AnimChannel()
+        },
+        agent: agent(vec2(1000, 500), {
+            radius: 10,
+            mass: .8,
+            maxSpeed: 1000,
+            maxForce: 2000,
+            turnRate: 10
+        }),
+        behaviors: [
+            new WanderJitter(.8, .05),
+            new Arrive(1, 2, 10, car1_seek_target_provider),
+            //new PathFollow(2, .7, path, 100, 10),
+            new FlightAvoidance(100, () => [{position: cursor.xy, radius: 200}, { position: car.xy, radius: 100 }], 120, 1, 0.2)
+        ],
+        bounds: [
+            ...walls.map(_ => new ConvexPolygonBoundary(_)),
+            ...shapes.map(_ => new ConvexPolygonBoundary(_)),
+        ]
+    }
+
+
+
     cursor = {
         xy: vec2(500, 500)
     }
@@ -125,6 +161,7 @@ export function _update(delta: number) {
     cursor.xy = vec2(drag.is_hovering[0], drag.is_hovering[1])
 
     update_car(car, delta)
+    update_car(car2, delta)
 
     drag.update(delta)
 }
@@ -153,6 +190,83 @@ function update_car(car: Car, delta: number) {
     car.channels.theta.update(delta / 1000)
 }
 
+
+export const bull_mesh: Mesh = [
+    {
+        layer: 0,
+        color: colors.darkblue,
+        offset: vec2(0, 16),
+        thicknessMul: 1.2,
+        lines: [
+            {
+                A: vec2(30, -20),
+                B: vec2(20, 60),
+                thickness: 22 + 6
+            },
+            {
+                A: vec2(-20, -30),
+                B: vec2(-10, 40),
+                thickness: 32 + 2
+            },
+        ]
+    },
+    {
+        layer: 2,
+        color: colors.darkblue,
+        offset: vec2(0, 0),
+        thicknessMul: 1.5,
+        lines: [
+            {
+                A: vec2(30, -20),
+                B: vec2(20, 60),
+                thickness: 22 + 2
+            },
+            {
+                A: vec2(-20, -30),
+                B: vec2(-10, 40),
+                thickness: 32
+            },
+        ]
+    },
+    {
+        layer: 3,
+        color: colors.orange,
+        offset: vec2(0, 0),
+        thicknessMul: 1,
+        lines: [
+            {
+                A: vec2(30, -20),
+                B: vec2(20, 60),
+                thickness: 22
+            },
+            {
+                A: vec2(-20, -30),
+                B: vec2(-10, 40),
+                thickness: 34
+            },
+        ]
+    },
+]
+
+export function render_mesh(mesh: Mesh, x: number, y: number, theta: number) {
+
+    for (let info of mesh) {
+        let { color, offset, thicknessMul, lines } = info
+
+        for (let line of lines) {
+            let thickness = line.thickness * thicknessMul
+
+            let a = vec2(offset.x + line.A.x, offset.y + line.A.y)
+            let b = vec2(offset.x + line.B.x, offset.y + line.B.y)
+
+            a = rotateVec2(a, theta)
+            b = rotateVec2(b, theta)
+
+            batch.strokeLine(x + a.x, y + a.y, x + b.x, y + b.y, thickness, color)
+        }
+    }
+}
+
 export function _render() {
 
     batch.beginFrame()
@@ -161,10 +275,13 @@ export function _render() {
     batch.fillRect(1920/2, 1080/2, 1920, 1080, vibrant.darkblue)
     batch.fillRoundRect(1920/2, 420, 1220, 800, 20, colors.brown)
 
-    render_car(car.xy.x, car.xy.y, car.theta)
+    //render_car(car.xy.x, car.xy.y, car.theta)
     render_car(500, 500, 0)
 
-    //render_car(500, 500, 0)
+    render_mesh(bull_mesh, 1000, 500, 0)
+    render_mesh(bull_mesh, car2.xy.x, car2.xy.y, car2.theta)
+    render_mesh(bull_mesh, car.xy.x, car.xy.y, car.theta)
+
 
     render_cursor()
 

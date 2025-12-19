@@ -1,7 +1,7 @@
 import { advanceAlongPath, closestPointOnSegment, collisionSurface, findClosestSegmentIndex, lateralOffset, type Poly } from "./polygon"
 import { rect_bottom, rect_left, rect_right, rect_top, type Rect } from "./rect"
 import { clamp, wrapAngle } from "./scalar"
-import { add, clampLength, distance, dot, fromAngle, len2, length, mulScalar, normalize, normalizeSafe, sub, vec2, type Vec2 } from "./vec2"
+import { add, clampLength, dot, fromAngle, len2, length, mulScalar, normalize, normalizeSafe, sub, vec2, type Vec2 } from "./vec2"
 
 export interface Agent {
   position: Vec2
@@ -93,27 +93,38 @@ export class Seek implements SteeringBehavior {
 
 export class Arrive implements SteeringBehavior {
 
-    target: Vec2
-    slowRadius: number
+
     weight: number
+    speedFactor: number
+
+    target: TargetProvider
+    slowRadius: number
 
   constructor(
-    target: Vec2,
+    weight: number,
+    speedFactor: number,
     slowRadius: number,
-    weight = 1
+    target: TargetProvider,
   ) {
+    this.weight = weight
+    this.speedFactor = speedFactor
     this.target = target
     this.slowRadius = slowRadius
-    this.weight = weight
   }
 
   compute(agent: Agent): Vec2 {
-    const toTarget = sub(this.target, agent.position)
+
+    let target = this.target()
+    if (!target) {
+      return vec2()
+    }
+
+    const toTarget = sub(target, agent.position)
     const dist = length(toTarget)
 
     if (dist === 0) return vec2()
 
-    const speed = agent.maxSpeed * Math.min(dist / this.slowRadius, 1)
+    const speed = agent.maxSpeed * this.speedFactor * Math.min(dist / this.slowRadius, 1)
     const desired = mulScalar(normalize(toTarget), speed)
 
     return mulScalar(sub(desired, agent.velocity), this.weight)
@@ -433,6 +444,77 @@ export class Wander implements SteeringBehavior {
     }
 }
 
+export class FlightAvoidance implements SteeringBehavior {
+  weight: number
+  obstacles: () => Obstacle[]
+  radius: number
+  falloff: number
+  forwardBias: number
+
+  constructor(
+    weight: number,
+    obstacles: () => Obstacle[],
+    radius = 120,
+    falloff = 2,
+    forwardBias = 0.5
+  ) {
+    this.weight = weight
+    this.obstacles = obstacles
+    this.radius = radius
+    this.falloff = falloff
+    this.forwardBias = forwardBias
+  }
+
+  compute(agent: Agent): Vec2 {
+    const speed = length(agent.velocity)
+    if (speed === 0) return vec2()
+
+    const fwd = normalize(agent.velocity)
+    let force = vec2()
+
+    for (const obs of this.obstacles()) {
+      const offset = sub(agent.position, obs.position)
+      const dist = length(offset)
+      const R = this.radius + obs.radius
+
+      if (dist >= R || dist === 0) continue
+
+      let away = normalize(offset)
+
+      // ---- Angular bias: remove backward component ----
+      const backDot = dot(away, mulScalar(fwd, -1))
+      if (backDot > 0) {
+        away = sub(away, mulScalar(fwd, backDot))
+      }
+
+      // Fallback if numerically unstable
+      if (len2(away) === 0) continue
+
+      away = normalize(away)
+
+      // Falloff strength
+      const strength = Math.pow(1 - dist / R, this.falloff)
+
+      // Forward bias keeps momentum
+      const biased = add(
+        mulScalar(away, 1 - this.forwardBias),
+        mulScalar(fwd, this.forwardBias)
+      )
+
+      force = add(force, mulScalar(biased, strength))
+    }
+
+    if (len2(force) === 0) return vec2()
+
+    force = normalize(force)
+    force = mulScalar(force, agent.maxForce)
+
+    return mulScalar(force, this.weight)
+  }
+}
+
+
+
 export type Obstacle = {
   position: Vec2,
   radius: number
@@ -448,52 +530,66 @@ export class ObstacleAvoidance implements SteeringBehavior {
     obstacles: () => Obstacle[],
     lookAhead = 100,
   ) {
+    this.weight = weight
     this.obstacles = obstacles
     this.lookAhead = lookAhead
-    this.weight = weight
   }
 
   compute(agent: Agent): Vec2 {
-    if (length(agent.velocity) === 0) return vec2()
+    const speed = length(agent.velocity)
+    if (speed === 0) return vec2()
 
     const forward = normalize(agent.velocity)
 
-    // Dynamic look-ahead based on speed
-    const speedFactor = length(agent.velocity) / agent.maxSpeed
-    const dynamicLookAhead = this.lookAhead * speedFactor
+    // Prevent lookAhead collapse at low speeds
+    const dynamicLookAhead = Math.max(
+      this.lookAhead * (speed / agent.maxSpeed),
+      agent.radius * 2
+    )
 
-    let mostThreatening: Obstacle | null = null
-    let closestDist = Infinity
+    let closestT = Infinity
+    let threat: Obstacle | null = null
+    let hitPoint = vec2()
+
+    let penetration = 0
 
     for (const obs of this.obstacles()) {
-      const toObstacle = sub(obs.position, agent.position)
+      const R = agent.radius + obs.radius
 
-      // Project obstacle onto forward vector
-      const projection = dot(toObstacle, forward)
-      if (projection < 0 || projection > dynamicLookAhead) continue
+      // Vector from agent to obstacle
+      const toObs = sub(obs.position, agent.position)
 
-      // Closest point on ray
-      const closestPoint = add(
-        agent.position,
-        mulScalar(forward, projection)
-      )
+      // Project onto forward vector
+      const t = dot(toObs, forward)
 
-      const distToRay = distance(obs.position, closestPoint)
-      const combinedRadius = agent.radius + obs.radius
+      // Outside swept segment
+      if (t < 0 || t > dynamicLookAhead) continue
 
-      if (distToRay < combinedRadius && projection < closestDist) {
-        closestDist = projection
-        mostThreatening = obs
+      // Closest point on sweep segment
+      const closest = add(agent.position, mulScalar(forward, t))
+
+      // Distance from obstacle center to sweep axis
+      const distSq = len2(sub(obs.position, closest))
+
+      if (distSq > R * R) continue
+
+      // Keep nearest intersection
+      if (t < closestT) {
+        closestT = t
+        threat = obs
+        hitPoint = closest
+        penetration = 1 - Math.sqrt(distSq) / R
       }
     }
 
-    if (!mostThreatening) return vec2()
+    if (!threat) return vec2()
 
-    // Steer away from obstacle
-    const away = sub(agent.position, mostThreatening.position)
-    const desired = normalize(away)
+    // Lateral avoidance force (push out of capsule)
+    const avoidanceDir = normalize(
+      sub(hitPoint, threat.position)
+    )
 
-    const force = mulScalar(desired, agent.maxForce)
+    const force = mulScalar(avoidanceDir, agent.maxForce * penetration)
 
     return mulScalar(force, this.weight)
   }
