@@ -34,11 +34,6 @@ body, #app {
   height: 100%;
   background-color: transparent;
   touch-action: none;
-  pointer-events: none;
-  display: block;
-}
-
-#app .interactive {
   pointer-events: all;
-  cursor: none;
+  display: block;
 }

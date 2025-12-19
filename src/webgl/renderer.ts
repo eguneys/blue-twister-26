@@ -1,6 +1,6 @@
 import VERT_SRC from './shape.vert'
 import FRAG_SRC from './shape.frag'
-import { projectionMatrix } from '../math/mat2';
+import { projectionMatrix } from '../math/mat4';
 
 
 export class Renderer {

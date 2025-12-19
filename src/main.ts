@@ -3,6 +3,7 @@ import { Loop } from "./loop"
 import * as simulate from './simulation2'
 import { audio } from "./simulation2"
 import { Init_canvas } from './webgl/canvas'
+import { DragHandler } from './drag'
 
 type Scene = {
     _init(): void
@@ -76,11 +77,13 @@ function _cleanup() {
 
 export async function main(el: HTMLElement) {
 
-    let { batch } = Init_canvas(el, _render)
+    let { batch, canvas } = Init_canvas(el, _render)
+
+    let drag = DragHandler(canvas)
 
     await audio.load()
 
-    simulate._set_ctx(batch)
+    simulate._set_ctx(batch, drag)
 
     _init()
 

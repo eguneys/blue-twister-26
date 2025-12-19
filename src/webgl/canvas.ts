@@ -3,6 +3,7 @@ import { Renderer } from "./renderer"
 
 export type InitCanvas = {
     batch: BatchRenderer
+    canvas: HTMLCanvasElement
     cleanup: () => void
 }
 
@@ -45,6 +46,7 @@ export function Init_canvas(container: HTMLElement, _render: () => void): InitCa
     container.appendChild(canvas)
 
     return {
+        canvas,
         batch,
         cleanup() {
             renderer.cleanup()

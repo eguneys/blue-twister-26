@@ -29,7 +29,7 @@ export function DragHandler(el: HTMLCanvasElement) {
     let t_double_click = 0
 
     function scale_e(e: XY): XY {
-        return [e[0] * el.width, e[1] * el.height]
+        return [e[0] * 1920, e[1] * 1080]
     }
 
     let hooks = {

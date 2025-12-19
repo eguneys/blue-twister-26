@@ -1,8 +1,23 @@
-import type { Vec2 } from "./vec2"
+import { vec2, type Vec2 } from "./vec2"
 
 export type Rect = {
     xy: Vec2,
     wh: Vec2
+}
+
+export const rect = (x: number, y: number, w: number, h: number) => ({xy: vec2(x, y), wh: vec2(w, h)})
+
+export const rect_left = (r: Rect) => r.xy.x
+export const rect_right = (r: Rect) => r.xy.x + r.wh.x
+export const rect_top = (r: Rect) => r.xy.y
+export const rect_bottom = (r: Rect) => r.xy.y + r.wh.y
+
+export const rect_abcd = (rect: Rect) => {
+    let a = vec2(rect_left(rect), rect_top(rect))
+    let b = vec2(rect_right(rect), rect_top(rect))
+    let c = vec2(rect_right(rect), rect_bottom(rect))
+    let d = vec2(rect_left(rect), rect_bottom(rect))
+    return [a, b, c, d]
 }
 
 export function box_intersect(a: Rect, b: Rect) {
