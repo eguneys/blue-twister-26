@@ -111,5 +111,6 @@ void main() {
         }
     }
 
-    fragColor = vec4(v_color.rgb, v_color.a * alpha);
+    float a= v_color.a * alpha;
+    fragColor = vec4(v_color.rgb * a, a);
 }

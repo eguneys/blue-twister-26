@@ -159,9 +159,10 @@ export function _render() {
 
     //batch.fillRect(1920/2, 1080/2, 1920, 1080, colors.darkblue)
     batch.fillRect(1920/2, 1080/2, 1920, 1080, vibrant.darkblue)
-    batch.fillRect(1920/2, 420, 1200 - 18, 800 - 18, colors.brown)
+    batch.fillRoundRect(1920/2, 420, 1220, 800, 20, colors.brown)
 
     render_car(car.xy.x, car.xy.y, car.theta)
+    render_car(500, 500, 0)
 
     //render_car(500, 500, 0)
 
@@ -281,7 +282,7 @@ function render_car(x: number, y: number, theta: number) {
 
     // color
     let inset_spots = rotateVec2(vec2(3, 3), theta)
-    batch.fillRoundRect(xy.x, xy.y, w, h, 8, colors.brown, theta)
+    batch.fillRoundRect(xy.x, xy.y, w, h, 8, colors.white, theta)
     batch.fillRoundRect(xy.x + inset_spots.x, xy.y + inset_spots.y, w - 5, h - 5, 8, color, theta)
 
     lxy = mxy
@@ -317,8 +318,8 @@ function render_car(x: number, y: number, theta: number) {
     lbxy = rotateVec2(lbxy, theta)
     lbxy2 = rotateVec2(lbxy2, theta)
     lbxy3 = rotateVec2(lbxy3, theta)
-    batch.strokeLine(xy.x + lbxy.x, xy.y + lbxy.y, xy.x + lbxy2.x, xy.y + lbxy2.y, thick + lthick * 2, colors.brown)
-    batch.strokeLine(xy.x + lbxy2.x, xy.y + lbxy2.y, xy.x + lbxy3.x, xy.y + lbxy3.y, thick + lthick, colors.brown)
+    batch.strokeLine(xy.x + lbxy.x, xy.y + lbxy.y, xy.x + lbxy2.x, xy.y + lbxy2.y, thick + lthick * 2, vibrant.white)
+    batch.strokeLine(xy.x + lbxy2.x, xy.y + lbxy2.y, xy.x + lbxy3.x, xy.y + lbxy3.y, thick + lthick, vibrant.white)
 
 
 }
