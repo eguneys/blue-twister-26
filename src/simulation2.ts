@@ -159,7 +159,7 @@ export function _render() {
 
     //batch.fillRect(1920/2, 1080/2, 1920, 1080, colors.darkblue)
     batch.fillRect(1920/2, 1080/2, 1920, 1080, vibrant.darkblue)
-    batch.fillRect(1920/2, 420, 1200 - 18, 800 - 18, colors.darkgreen)
+    batch.fillRect(1920/2, 420, 1200 - 18, 800 - 18, colors.brown)
 
     render_car(car.xy.x, car.xy.y, car.theta)
 
@@ -193,7 +193,7 @@ function render_car(x: number, y: number, theta: number) {
     //batch.fillRoundRect(1920/2 + xy.x, 420 + xy.y, w + 10, h + 20, 8, colors.darkred, theta)
 
     //let [shadow, color] = [colors.darkred, colors.pink]
-    let [shadow, color] = [colors.darkblue, colors.brown]
+    let [shadow, color] = [colors.darkblue, colors.orange]
 
     let mxy = vec2(w/4, -h/2 + 15)
     let mxy2 = vec2(w / 2, -h/2 + 10)
@@ -205,6 +205,10 @@ function render_car(x: number, y: number, theta: number) {
 
     let txy = vec2(0, h/2 - 2)
     let txy2 = vec2(Math.sin(time * 10) * 2, h/2)
+
+    let bxy = vec2(0, -10)
+    let bxy2 = vec2(2, 0)
+    let bxy3 = vec2(2, 10)
 
     let shadow_off = 12
     let lthick = 7
@@ -276,7 +280,9 @@ function render_car(x: number, y: number, theta: number) {
 
 
     // color
-    batch.fillRoundRect(xy.x, xy.y, w, h, 8, color, theta)
+    let inset_spots = rotateVec2(vec2(3, 3), theta)
+    batch.fillRoundRect(xy.x, xy.y, w, h, 8, colors.brown, theta)
+    batch.fillRoundRect(xy.x + inset_spots.x, xy.y + inset_spots.y, w - 5, h - 5, 8, color, theta)
 
     lxy = mxy
     lxy2 = mxy2
@@ -302,10 +308,18 @@ function render_car(x: number, y: number, theta: number) {
     ltxy2 = txy2
     ltxy = rotateVec2(ltxy, theta)
     ltxy2 = rotateVec2(ltxy2, theta)
-
-
-
     batch.strokeLine(xy.x + ltxy.x, xy.y + ltxy.y, xy.x + ltxy2.x, xy.y + ltxy2.y, lthick, color)
+
+
+    let lbxy = bxy
+    let lbxy2 = bxy2
+    let lbxy3 = bxy3
+    lbxy = rotateVec2(lbxy, theta)
+    lbxy2 = rotateVec2(lbxy2, theta)
+    lbxy3 = rotateVec2(lbxy3, theta)
+    batch.strokeLine(xy.x + lbxy.x, xy.y + lbxy.y, xy.x + lbxy2.x, xy.y + lbxy2.y, thick + lthick * 2, colors.brown)
+    batch.strokeLine(xy.x + lbxy2.x, xy.y + lbxy2.y, xy.x + lbxy3.x, xy.y + lbxy3.y, thick + lthick, colors.brown)
+
 
 }
 
