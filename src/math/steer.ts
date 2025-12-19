@@ -1,7 +1,7 @@
 import { advanceAlongPath, closestPointOnSegment, collisionSurface, findClosestSegmentIndex, lateralOffset, type Poly } from "./polygon"
 import { rect_bottom, rect_left, rect_right, rect_top, type Rect } from "./rect"
 import { clamp, wrapAngle } from "./scalar"
-import { add, clampLength, distance, dot, len2, length, mulScalar, normalize, normalizeSafe, sub, vec2, type Vec2 } from "./vec2"
+import { add, clampLength, distance, dot, fromAngle, len2, length, mulScalar, normalize, normalizeSafe, sub, vec2, type Vec2 } from "./vec2"
 
 export interface Agent {
   position: Vec2
@@ -52,14 +52,20 @@ export interface SteeringBehavior {
 type TargetProvider = () => Vec2 | undefined
 
 export class Seek implements SteeringBehavior {
-    target: TargetProvider
+
     weight: number
+    speedFactor: number
+
+    target: TargetProvider
     constructor(
         weight: number,
+        speedFactor: number,
         target: TargetProvider,
     ) {
-        this.target = target
         this.weight = weight
+        this.speedFactor = speedFactor
+
+        this.target = target
     }
 
     compute(agent: Agent): Vec2 {
@@ -79,7 +85,7 @@ export class Seek implements SteeringBehavior {
         }
 
         const desired =
-            mulScalar(normalize(toTarget), agent.maxSpeed)
+            mulScalar(normalize(toTarget), agent.maxSpeed * this.speedFactor)
 
         return mulScalar(sub(desired, agent.velocity), this.weight)
     }
@@ -333,6 +339,32 @@ export class ConvexPolygonBoundary implements Boundary {
     }
 }
 
+export class WanderJitter implements SteeringBehavior {
+    weight: number
+    interval: number
+    timer = 0
+    wanderAngle = 0
+
+    constructor(weight: number, interval = 0.25) {
+        this.interval = interval
+        this.weight = weight
+        this.wanderAngle = Math.random() * Math.PI * 2
+    }
+
+    compute(agent: Agent, dt: number): Vec2 {
+        this.timer -= dt
+
+        if (this.timer <= 0) {
+            const range = Math.PI
+            this.wanderAngle += (Math.random() * 2 - 1) * range
+            this.timer = this.interval
+        }
+
+        const dir = fromAngle(this.wanderAngle)
+        return mulScalar(dir, agent.maxForce * this.weight)
+    }
+}
+
 
 
 export class Wander implements SteeringBehavior {
@@ -473,8 +505,11 @@ export class ObstacleAvoidance implements SteeringBehavior {
 export type Path = Poly
 
 export class PathFollow implements SteeringBehavior {
-  path: Path
+
   weight: number
+  speedFactor: number
+
+  path: Path
   lookAhead: number
   arriveRadius: number
 
@@ -482,14 +517,16 @@ export class PathFollow implements SteeringBehavior {
 
   constructor(
     weight: number,
+    speedFactor: number,
     path: Path,
     lookAhead = 40,
     arriveRadius = 8,
   ) {
+    this.weight = weight
+    this.speedFactor = speedFactor
     this.path = path
     this.lookAhead = lookAhead
     this.arriveRadius = arriveRadius
-    this.weight = weight
   }
 
   compute(agent: Agent): Vec2 {
@@ -530,7 +567,7 @@ export class PathFollow implements SteeringBehavior {
 
     const desiredVelocity = mulScalar(
       normalize(desired),
-      agent.maxSpeed
+      agent.maxSpeed * this.speedFactor
     )
 
     const steering = sub(desiredVelocity, agent.velocity)

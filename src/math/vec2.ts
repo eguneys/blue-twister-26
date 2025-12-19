@@ -10,6 +10,9 @@ export function normalizeSafe(v: Vec2): Vec2 {
     return len > 0.0001 ? mulScalar(v, 1/len) : vec2()
 }
 
+export function fromAngle(theta: number) {
+     return vec2(Math.cos(theta), Math.sin(theta))
+}
 
 export function vec2(x=0,y=0){ return {x, y}; }
 export function add(a: Vec2,b: Vec2){ return {x: a.x+b.x, y: a.y+b.y}; }

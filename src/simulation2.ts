@@ -1,10 +1,10 @@
 import type { SceneName } from "./main"
-import { colors } from './colors_in_gl'
+import { colors, vibrant } from './colors_in_gl'
 import { box_intersect, rect, type Rect } from "./math/rect"
 import { AudioContent } from "./audio/audio"
 import { rotateVec2, vec2, type Vec2 } from "./math/vec2"
 import type { BatchRenderer } from "./webgl/BatchRenderer"
-import { agent, ConvexPolygonBoundary, CorridorFollow, PathFollow, Seek, update_agent, Wander, type Agent, type Boundary, type SteeringBehavior } from "./math/steer"
+import { agent, ConvexPolygonBoundary, PathFollow, Seek, update_agent, Wander, WanderJitter, type Agent, type Boundary, type SteeringBehavior } from "./math/steer"
 import type { DragHandler } from "./drag"
 import { poly_from_rect, type Poly } from "./math/polygon"
 import { AnimChannel } from "./anim"
@@ -64,10 +64,10 @@ const cursor_hit = (box: Rect) => {
 export function _init() {
 
     walls = [
-        poly_from_rect(rect(150, 0, 1500, 30)),
-        poly_from_rect(rect(150, 810, 1500, 30)),
-        poly_from_rect(rect(340, 0, 30, 1500)),
-        poly_from_rect(rect(1550, 0, 30, 1500)),
+        poly_from_rect(rect(150, 0, 1500, 70)),
+        poly_from_rect(rect(150, 810, 1500, 70)),
+        poly_from_rect(rect(340, 0, 70, 1500)),
+        poly_from_rect(rect(1550, 0, 70, 1500)),
     ]
 
 
@@ -98,15 +98,14 @@ export function _init() {
         agent: agent(vec2(1000, 500), {
             radius: 10,
             mass: 1,
-            maxSpeed: 500,
-            maxForce: 1000,
+            maxSpeed: 1000,
+            maxForce: 2000,
             turnRate: 10
         }),
         behaviors: [
-            //new Wander(1, 50, 500, Math.PI),
-            new Seek(8, cursor_inside_surface_target_provider),
-            new PathFollow(2, path, 100, 10),
-            new CorridorFollow(1, path, 1, 1),
+            new WanderJitter(.8, .05),
+            new Seek(8, 2, cursor_inside_surface_target_provider),
+            new PathFollow(2, .7, path, 100, 10),
         ],
         bounds: [
             ...walls.map(_ => new ConvexPolygonBoundary(_)),
@@ -158,10 +157,13 @@ export function _render() {
 
     batch.beginFrame()
 
-    batch.fillRect(1920/2, 1080/2, 1920, 1080, colors.darkblue)
-    batch.fillRect(1920/2, 420, 1200 - 18, 800 - 18, colors.red)
+    //batch.fillRect(1920/2, 1080/2, 1920, 1080, colors.darkblue)
+    batch.fillRect(1920/2, 1080/2, 1920, 1080, vibrant.darkblue)
+    batch.fillRect(1920/2, 420, 1200 - 18, 800 - 18, colors.darkgreen)
 
     render_car(car.xy.x, car.xy.y, car.theta)
+
+    //render_car(500, 500, 0)
 
     render_cursor()
 
@@ -190,13 +192,19 @@ function render_car(x: number, y: number, theta: number) {
 
     //batch.fillRoundRect(1920/2 + xy.x, 420 + xy.y, w + 10, h + 20, 8, colors.darkred, theta)
 
-    let [shadow, color] = [colors.darkred, colors.pink]
+    //let [shadow, color] = [colors.darkred, colors.pink]
+    let [shadow, color] = [colors.darkblue, colors.brown]
 
     let mxy = vec2(w/4, -h/2 + 15)
-    let mxy2 = vec2(w / 2, -h/2 + 24)
+    let mxy2 = vec2(w / 2, -h/2 + 10)
+    let mxy2a = vec2(w / 2, -h/2 + 5)
 
     let mxy3 = vec2(-w/4, -h/2 + 15)
-    let mxy4 = vec2(-w / 2, -h/2 + 24)
+    let mxy4 = vec2(-w / 2, -h/2 + 10)
+    let mxy4a = vec2(-w / 2, -h/2 + 5)
+
+    let txy = vec2(0, h/2 - 2)
+    let txy2 = vec2(Math.sin(time * 10) * 2, h/2)
 
     let shadow_off = 12
     let lthick = 7
@@ -209,7 +217,11 @@ function render_car(x: number, y: number, theta: number) {
     let lxy2 = mxy2
     lxy = rotateVec2(lxy, theta)
     lxy2 = rotateVec2(lxy2, theta)
-    batch.strokeLine(xy.x + lxy.x, xy.y + lxy.y, xy.x + + lxy2.x, xy.y + lxy2.y, thick / 2 + lthick, shadow)
+    batch.strokeLine(xy.x + lxy.x, xy.y + lxy.y, xy.x + lxy2.x, xy.y + lxy2.y, thick / 2 + lthick, shadow)
+
+    let lxy2a = mxy2a
+    lxy2a = rotateVec2(lxy2a, theta)
+    batch.strokeLine(xy.x + lxy2.x, xy.y + lxy2.y, xy.x + lxy2a.x, xy.y + lxy2a.y, thick / 2 + lthick / 3, shadow)
 
     lxy = mxy3
     lxy2 = mxy4
@@ -217,15 +229,33 @@ function render_car(x: number, y: number, theta: number) {
     lxy2 = rotateVec2(lxy2, theta)
     batch.strokeLine(xy.x + lxy.x, xy.y + lxy.y, xy.x + lxy2.x, xy.y + lxy2.y, thick / 2 + lthick, shadow)
 
+    lxy2a = mxy4a
+    lxy2a = rotateVec2(lxy2a, theta)
+    batch.strokeLine(xy.x + lxy2.x, xy.y + lxy2.y, xy.x + lxy2a.x, xy.y + lxy2a.y, thick / 2 + lthick / 3, shadow)
+
+    let ltxy = txy
+    let ltxy2 = txy2
+    ltxy = rotateVec2(ltxy, theta)
+    ltxy2 = rotateVec2(ltxy2, theta)
+
+    batch.strokeLine(xy.x + ltxy.x, xy.y + ltxy.y, xy.x + ltxy2.x, xy.y + ltxy2.y, thick + lthick / 2, shadow)
+
 
     xy.y -= shadow_off
     batch.fillRoundRect(xy.x, xy.y, w + thick, h + thick, 8, shadow, theta)
 
+    // outline
     lxy = mxy
     lxy2 = mxy2
     lxy = rotateVec2(lxy, theta)
     lxy2 = rotateVec2(lxy2, theta)
     batch.strokeLine(xy.x + lxy.x, xy.y + lxy.y, xy.x + lxy2.x, xy.y + lxy2.y, lthick + thick, shadow)
+
+
+    lxy2a = mxy2a
+    lxy2a = rotateVec2(lxy2a, theta)
+    batch.strokeLine(xy.x + lxy2.x, xy.y + lxy2.y, xy.x + lxy2a.x, xy.y + lxy2a.y, lthick / 3 + thick, shadow)
+
 
     lxy = mxy3
     lxy2 = mxy4
@@ -233,7 +263,19 @@ function render_car(x: number, y: number, theta: number) {
     lxy2 = rotateVec2(lxy2, theta)
     batch.strokeLine(xy.x + lxy.x, xy.y + lxy.y, xy.x + lxy2.x, xy.y + lxy2.y, lthick + thick, shadow)
 
+    lxy2a = mxy4a
+    lxy2a = rotateVec2(lxy2a, theta)
+    batch.strokeLine(xy.x + lxy2.x, xy.y + lxy2.y, xy.x + lxy2a.x, xy.y + lxy2a.y, lthick / 3+ thick, shadow)
 
+    ltxy = txy
+    ltxy2 = txy2
+    ltxy = rotateVec2(ltxy, theta)
+    ltxy2 = rotateVec2(ltxy2, theta)
+
+    batch.strokeLine(xy.x + ltxy.x, xy.y + ltxy.y, xy.x + ltxy2.x, xy.y + ltxy2.y, lthick + thick, shadow)
+
+
+    // color
     batch.fillRoundRect(xy.x, xy.y, w, h, 8, color, theta)
 
     lxy = mxy
@@ -242,12 +284,28 @@ function render_car(x: number, y: number, theta: number) {
     lxy2 = rotateVec2(lxy2, theta)
     batch.strokeLine(xy.x + lxy.x, xy.y + lxy.y, xy.x + lxy2.x, xy.y + lxy2.y, lthick, color)
 
+    lxy2a = mxy2a
+    lxy2a = rotateVec2(lxy2a, theta)
+    batch.strokeLine(xy.x + lxy2.x, xy.y + lxy2.y, xy.x + lxy2a.x, xy.y + lxy2a.y, lthick / 3, color)
+
     lxy = mxy3
     lxy2 = mxy4
     lxy = rotateVec2(lxy, theta)
     lxy2 = rotateVec2(lxy2, theta)
     batch.strokeLine(xy.x + lxy.x, xy.y + lxy.y, xy.x + lxy2.x, xy.y + lxy2.y, lthick, color)
 
+    lxy2a = mxy4a
+    lxy2a = rotateVec2(lxy2a, theta)
+    batch.strokeLine(xy.x + lxy2.x, xy.y + lxy2.y, xy.x + lxy2a.x, xy.y + lxy2a.y, lthick / 3, color)
+
+    ltxy = txy
+    ltxy2 = txy2
+    ltxy = rotateVec2(ltxy, theta)
+    ltxy2 = rotateVec2(ltxy2, theta)
+
+
+
+    batch.strokeLine(xy.x + ltxy.x, xy.y + ltxy.y, xy.x + ltxy2.x, xy.y + ltxy2.y, lthick, color)
 
 }
 
