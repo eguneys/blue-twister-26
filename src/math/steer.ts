@@ -1,7 +1,7 @@
-import { collisionSurface, type Poly } from "./polygon"
+import { advanceAlongPath, closestPointOnSegment, collisionSurface, findClosestSegmentIndex, lateralOffset, type Poly } from "./polygon"
 import { rect_bottom, rect_left, rect_right, rect_top, type Rect } from "./rect"
 import { clamp, wrapAngle } from "./scalar"
-import { add, clampLength, dot, len2, length, mulScalar, normalize, normalizeSafe, sub, vec2, type Vec2 } from "./vec2"
+import { add, clampLength, distance, dot, len2, length, mulScalar, normalize, normalizeSafe, sub, vec2, type Vec2 } from "./vec2"
 
 export interface Agent {
   position: Vec2
@@ -168,10 +168,10 @@ export class BoundaryAvoidance implements SteeringBehavior {
     weight: number
 
   constructor(
+    weight: number,
     bounds: Rect,
     margin: number,
     strength: number,
-    weight = 1
   ) {
     this.bounds = bounds
     this.margin = margin
@@ -253,7 +253,7 @@ export function update_agent(body: Agent, behaviors: SteeringBehavior[], bounds:
     force = add(force, computeSteering(body, behaviors, delta))
 
     let bounds_force = vec2()
-    let k = 800
+    let k = 500
     let damping = 10
     // 2. Collision constraints (spring-based)
     for (const boundary of bounds) {
@@ -274,10 +274,10 @@ export function update_agent(body: Agent, behaviors: SteeringBehavior[], bounds:
     )
 
     // Velocity damping (friction)
-    const linearDamping = 12;
-    body.velocity = mulScalar(body.velocity, Math.exp(-linearDamping * delta));
+    //const linearDamping = 6;
+    //body.velocity = mulScalar(body.velocity, Math.exp(-linearDamping * delta));
 
-    if (length(body.velocity) < 80) {
+    if (length(body.velocity) < .1) {
         body.velocity = vec2();
     }
 
@@ -399,4 +399,200 @@ export class Wander implements SteeringBehavior {
             this.wanderAngle = Math.random() * Math.PI * 2
         }
     }
+}
+
+export type Obstacle = {
+  position: Vec2,
+  radius: number
+}
+
+export class ObstacleAvoidance implements SteeringBehavior {
+  weight: number
+  obstacles: () => Obstacle[]
+  lookAhead: number
+
+  constructor(
+    weight: number,
+    obstacles: () => Obstacle[],
+    lookAhead = 100,
+  ) {
+    this.obstacles = obstacles
+    this.lookAhead = lookAhead
+    this.weight = weight
+  }
+
+  compute(agent: Agent): Vec2 {
+    if (length(agent.velocity) === 0) return vec2()
+
+    const forward = normalize(agent.velocity)
+
+    // Dynamic look-ahead based on speed
+    const speedFactor = length(agent.velocity) / agent.maxSpeed
+    const dynamicLookAhead = this.lookAhead * speedFactor
+
+    let mostThreatening: Obstacle | null = null
+    let closestDist = Infinity
+
+    for (const obs of this.obstacles()) {
+      const toObstacle = sub(obs.position, agent.position)
+
+      // Project obstacle onto forward vector
+      const projection = dot(toObstacle, forward)
+      if (projection < 0 || projection > dynamicLookAhead) continue
+
+      // Closest point on ray
+      const closestPoint = add(
+        agent.position,
+        mulScalar(forward, projection)
+      )
+
+      const distToRay = distance(obs.position, closestPoint)
+      const combinedRadius = agent.radius + obs.radius
+
+      if (distToRay < combinedRadius && projection < closestDist) {
+        closestDist = projection
+        mostThreatening = obs
+      }
+    }
+
+    if (!mostThreatening) return vec2()
+
+    // Steer away from obstacle
+    const away = sub(agent.position, mostThreatening.position)
+    const desired = normalize(away)
+
+    const force = mulScalar(desired, agent.maxForce)
+
+    return mulScalar(force, this.weight)
+  }
+}
+
+
+
+
+export type Path = Poly
+
+export class PathFollow implements SteeringBehavior {
+  path: Path
+  weight: number
+  lookAhead: number
+  arriveRadius: number
+
+  private segmentIndex = 0
+
+  constructor(
+    weight: number,
+    path: Path,
+    lookAhead = 40,
+    arriveRadius = 8,
+  ) {
+    this.path = path
+    this.lookAhead = lookAhead
+    this.arriveRadius = arriveRadius
+    this.weight = weight
+  }
+
+  compute(agent: Agent): Vec2 {
+    if (this.path.points.length < 2) {
+      return vec2()
+    }
+
+    this.segmentIndex = findClosestSegmentIndex(agent.position, this.path)
+
+    // 1. Find closest point on current segment
+    const a = this.path.points[this.segmentIndex % this.path.points.length]
+    const b = this.path.points[(this.segmentIndex + 1) % this.path.points.length]
+
+    let closest = closestPointOnSegment(agent.position, a, b)
+
+    /*
+    // 2. If near end of segment, advance segment index
+    if (distance(closest.point, b) < this.arriveRadius) {
+      this.segmentIndex++
+    }
+      */
+
+    // 3. Compute carrot point ahead on path
+    const { point: target } = advanceAlongPath(
+      this.path,
+      this.segmentIndex,
+      closest.point,
+      this.lookAhead
+    )
+
+    // 4. Seek the carrot
+    const desired = sub(target, agent.position)
+    const dist = length(desired)
+
+    if (dist < 0.0001) {
+      return vec2()
+    }
+
+    const desiredVelocity = mulScalar(
+      normalize(desired),
+      agent.maxSpeed
+    )
+
+    const steering = sub(desiredVelocity, agent.velocity)
+
+    return mulScalar(steering, this.weight)
+  }
+}
+
+
+export class CorridorFollow implements SteeringBehavior {
+  path: Path
+  weight: number
+  corridorRadius: number
+  stiffness: number
+
+  private segmentIndex = 0
+
+  constructor(
+    weight: number,
+    path: Path,
+    corridorRadius = 24,
+    stiffness = 1,
+  ) {
+    this.path = path
+    this.corridorRadius = corridorRadius
+    this.stiffness = stiffness
+    this.weight = weight
+  }
+
+  compute(agent: Agent): Vec2 {
+    if (this.path.points.length < 2) {
+      return vec2()
+    }
+
+    const a = this.path.points[this.segmentIndex % this.path.points.length]
+    const b = this.path.points[(this.segmentIndex + 1) % this.path.points.length]
+
+    const { offset, normal } =
+      lateralOffset(agent.position, a, b)
+
+    // Advance segment if agent passed it
+    const segmentDir = normalize(sub(b, a))
+    if (dot(sub(agent.position, b), segmentDir) > 0) {
+      this.segmentIndex++
+    }
+
+    const absOffset = Math.abs(offset)
+
+    // Inside corridor → no correction
+    if (absOffset < this.corridorRadius) {
+      return vec2()
+    }
+
+    // Outside corridor → push back toward centerline
+    const penetration = absOffset - this.corridorRadius
+    const direction = offset > 0 ? -1 : 1
+
+    const correction = mulScalar(
+      normal,
+      penetration * direction * this.stiffness
+    )
+
+    return mulScalar(correction, this.weight)
+  }
 }

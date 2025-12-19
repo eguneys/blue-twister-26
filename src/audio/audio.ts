@@ -1,3 +1,4 @@
+// @ts-ignore
 async function load_audio(ctx: AudioContext, src: string) {
     const buffer = await fetch(src).then(_ => _.arrayBuffer())
     const audio_buffer = await ctx.decodeAudioData(buffer)

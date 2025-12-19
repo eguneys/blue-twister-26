@@ -1,6 +1,6 @@
 import { rect_abcd, type Rect } from "./rect";
 import type { Penetration } from "./steer";
-import { add, dot, mulScalar, sub, vec2, type Vec2 } from "./vec2";
+import { length, add, dot, mulScalar, normalize, sub, vec2, type Vec2, len2 } from "./vec2";
 
 export type Poly = {
     points: Vec2[];        // in CCW order, closed implicitly (last -> first)
@@ -188,7 +188,7 @@ export function findSegmentAtPoint(points: Vec2[], click: Vec2, eps = 3): number
 }
 
 // Utility: closest point on segment AB to point P, returns {point, t} where t in [0,1]
-export function closestPointOnSegment(A: Vec2, B: Vec2, P: Vec2) {
+export function closestPointOnSegment(P: Vec2, A: Vec2, B: Vec2) {
   const AB = sub(B, A);
   const t = (() => {
     const denom = dot(AB, AB);
@@ -210,4 +210,87 @@ export function pointInPolygon(pt: Vec2, poly: Poly): boolean {
     if (intersect) inside = !inside;
   }
   return inside;
+}
+
+
+export function advanceAlongPath(
+  path: Poly,
+  startIndex: number,
+  startPoint: Vec2,
+  distance: number
+): { point: Vec2; index: number } {
+  let remaining = distance
+  let index = startIndex % path.points.length
+  let current = startPoint
+
+  while (remaining > 0) {
+    const nextIndex = (index + 1) % path.points.length
+    if (nextIndex >= path.points.length) {
+      return { point: current, index }
+    }
+
+    const next = path.points[nextIndex]
+    const segment = sub(next, current)
+    const len = length(segment)
+
+    if (len >= remaining) {
+      return {
+        point: add(current, mulScalar(normalize(segment), remaining)),
+        index
+      }
+    }
+
+    remaining -= len
+    current = next
+    index = nextIndex
+  }
+
+  return { point: current, index }
+}
+
+
+export function lateralOffset(
+  p: Vec2,
+  a: Vec2,
+  b: Vec2
+): { offset: number; normal: Vec2; closest: Vec2 } {
+  const ab = sub(b, a)
+  const dir = normalize(ab)
+  const normal = vec2(-dir.y, dir.x)
+
+  const closest = closestPointOnSegment(p, a, b)
+  const delta = sub(p, closest.point)
+
+  return {
+    offset: dot(delta, normal),
+    normal,
+    closest: closest.point
+  }
+}
+
+
+export function findClosestSegmentIndex(
+  p: Vec2,
+  path: Poly,
+  hint?: number
+): number {
+  let bestIndex = hint ?? 0
+  let bestDistSq = Infinity
+
+  const start = hint ? Math.max(0, hint - 1) : 0
+  const end = hint ? Math.min(path.points.length - 2, hint + 1) : path.points.length - 1
+
+  for (let i = start; i <= end; i++) {
+    const a = path.points[i % path.points.length]
+    const b = path.points[(i + 1) % path.points.length]
+    const c = closestPointOnSegment(p, a, b)
+    const d = len2(sub(p, c.point))
+
+    if (d < bestDistSq) {
+      bestDistSq = d
+      bestIndex = i
+    }
+  }
+
+  return bestIndex
 }

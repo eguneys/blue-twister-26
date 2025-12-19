@@ -2,9 +2,9 @@ import type { SceneName } from "./main"
 import { colors } from './colors_in_gl'
 import { box_intersect, rect, type Rect } from "./math/rect"
 import { AudioContent } from "./audio/audio"
-import { mulScalar, rotateVec2, vec2, type Vec2 } from "./math/vec2"
+import { rotateVec2, vec2, type Vec2 } from "./math/vec2"
 import type { BatchRenderer } from "./webgl/BatchRenderer"
-import { agent, ConvexPolygonBoundary, Seek, update_agent, Wander, type Agent, type Boundary, type SteeringBehavior } from "./math/steer"
+import { agent, ConvexPolygonBoundary, CorridorFollow, PathFollow, Seek, update_agent, Wander, type Agent, type Boundary, type SteeringBehavior } from "./math/steer"
 import type { DragHandler } from "./drag"
 import { poly_from_rect, type Poly } from "./math/polygon"
 import { AnimChannel } from "./anim"
@@ -47,6 +47,10 @@ let cursor: Cursor
 
 let walls: Poly[]
 
+let shapes: Poly[]
+
+let path: Poly
+
 const surface_box = rect(380, 40, 1150, 750)
 
 const cursor_box = () => {
@@ -59,6 +63,21 @@ const cursor_hit = (box: Rect) => {
 
 export function _init() {
 
+    walls = [
+        poly_from_rect(rect(150, 0, 1500, 30)),
+        poly_from_rect(rect(150, 810, 1500, 30)),
+        poly_from_rect(rect(340, 0, 30, 1500)),
+        poly_from_rect(rect(1550, 0, 30, 1500)),
+    ]
+
+
+
+    path = poly_from_rect(rect(600, 200, 800, 500))
+
+    shapes = [
+        poly_from_rect(rect(800, 300, 200, 200))
+    ]
+
     const cursor_inside_surface_target_provider = () => {
         if (!cursor_hit(surface_box)) {
             return undefined
@@ -69,13 +88,6 @@ export function _init() {
     time = 0
     is_muted = false
 
-    walls = [
-        poly_from_rect(rect(150, 0, 1500, 30)),
-        poly_from_rect(rect(150, 810, 1500, 30)),
-        poly_from_rect(rect(340, 0, 30, 1500)),
-        poly_from_rect(rect(1550, 0, 30, 1500)),
-   //poly_from_rect(rect(100, 100, 500, 500))
-    ]
 
     car = {
         xy: vec2(),
@@ -86,16 +98,19 @@ export function _init() {
         agent: agent(vec2(1000, 500), {
             radius: 10,
             mass: 1,
-            maxSpeed: 9000,
-            maxForce: 10000,
+            maxSpeed: 500,
+            maxForce: 1000,
             turnRate: 10
         }),
         behaviors: [
-            new Wander(3, 50, 500, Math.PI),
-            new Seek(4, cursor_inside_surface_target_provider)
+            //new Wander(1, 50, 500, Math.PI),
+            new Seek(8, cursor_inside_surface_target_provider),
+            new PathFollow(2, path, 100, 10),
+            new CorridorFollow(1, path, 1, 1),
         ],
         bounds: [
-            ...walls.map(_ => new ConvexPolygonBoundary(_))
+            ...walls.map(_ => new ConvexPolygonBoundary(_)),
+            ...shapes.map(_ => new ConvexPolygonBoundary(_)),
         ]
     }
 
@@ -150,9 +165,17 @@ export function _render() {
 
     render_cursor()
 
+
+
     render_debug()
 
     batch.endFrame()
+}
+
+function render_shapes() {
+    for (let shape of shapes) {
+        render_poly(shape)
+    }
 }
 
 function render_cursor() {
@@ -233,6 +256,11 @@ function render_debug() {
         walls.forEach(render_poly)
         render_rect(surface_box)
         render_rect(cursor_box())
+
+        //batch.strokeCircle(obs1.position.x, obs1.position.y, obs1.radius, 1, colors.yellow)
+        render_poly(path)
+
+        render_shapes()
     }
 }
 
