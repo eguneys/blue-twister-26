@@ -105,8 +105,8 @@ export function _init() {
             turnRate: 10
         }),
         behaviors: [
-            new WanderJitter(.8, .05),
-            new Seek(8, 2, cursor_inside_surface_target_provider),
+            new WanderJitter(2, .08),
+            new Seek(3, 3, cursor_inside_surface_target_provider),
             new PathFollow(2, .7, path, 100, 10),
         ],
         bounds: [
@@ -204,9 +204,29 @@ export const bull_mesh: Mesh = [
                 thickness: 22 + 6
             },
             {
-                A: vec2(-20, -30),
-                B: vec2(-10, 40),
+                A: vec2(-30, -30),
+                B: vec2(-20, 20),
                 thickness: 32 + 2
+            },
+            {
+                A: vec2(20, -40),
+                B: vec2(50, -50),
+                thickness: 14
+            },
+            {
+                A: vec2(-30, -50),
+                B: vec2(-50, -60),
+                thickness: 14
+            },
+            {
+                A: vec2(-50, -60),
+                B: vec2(-48, -73),
+                thickness: 12
+            },
+            {
+                A: vec2(50, -50),
+                B: vec2(48, -63),
+                thickness: 12
             },
         ]
     },
@@ -222,9 +242,29 @@ export const bull_mesh: Mesh = [
                 thickness: 22 + 2
             },
             {
-                A: vec2(-20, -30),
-                B: vec2(-10, 40),
+                A: vec2(-30, -30),
+                B: vec2(-20, 20),
                 thickness: 32
+            },
+            {
+                A: vec2(20, -40),
+                B: vec2(50, -50),
+                thickness: 14
+            },
+            {
+                A: vec2(-30, -50),
+                B: vec2(-50, -60),
+                thickness: 14
+            },
+            {
+                A: vec2(-50, -60),
+                B: vec2(-48, -73),
+                thickness: 10
+            },
+            {
+                A: vec2(50, -50),
+                B: vec2(48, -63),
+                thickness: 10
             },
         ]
     },
@@ -240,13 +280,78 @@ export const bull_mesh: Mesh = [
                 thickness: 22
             },
             {
-                A: vec2(-20, -30),
-                B: vec2(-10, 40),
+                A: vec2(-30, -30),
+                B: vec2(-20, 20),
                 thickness: 34
+            },
+            {
+                A: vec2(20, -40),
+                B: vec2(50, -50),
+                thickness: 14
+            },
+            {
+                A: vec2(-30, -50),
+                B: vec2(-50, -60),
+                thickness: 14
+            },
+            {
+                A: vec2(-50, -60),
+                B: vec2(-48, -73),
+                thickness: 8
+            },
+            {
+                A: vec2(50, -50),
+                B: vec2(48, -63),
+                thickness: 8
             },
         ]
     },
+    {
+
+        layer: 4,
+        color: vibrant.white,
+        offset: vec2(0, 0),
+        thicknessMul: 1,
+        lines: [
+            {
+                A: vec2(-18, 10),
+                B: vec2(-15, -8),
+                thickness: 24
+            },
+            {
+                A: vec2(-14, -19),
+                B: vec2(-10, 9),
+                thickness: 18
+            },
+            {
+                A: vec2(20, 20),
+                B: vec2(25, 30),
+                thickness: 12
+            },
+            {
+                A: vec2(30, 20),
+                B: vec2(25, 30),
+                thickness: 14
+            },
+            {
+                A: vec2(30 - 8, -20 - 8),
+                B: vec2(20 - 8, 60 + 8),
+                thickness: 3
+            },
+            {
+                A: vec2(-30 + 12, -30 - 8),
+                B: vec2(-20 + 12, 20 + 8),
+                thickness: 7
+            },
+            {
+                A: vec2(-20, -40),
+                B: vec2(18, -40),
+                thickness: 7
+            },
+        ]
+    }
 ]
+// bull mesh
 
 export function render_mesh(mesh: Mesh, x: number, y: number, theta: number) {
 
@@ -276,9 +381,9 @@ export function _render() {
     batch.fillRoundRect(1920/2, 420, 1220, 800, 20, colors.brown)
 
     //render_car(car.xy.x, car.xy.y, car.theta)
-    render_car(500, 500, 0)
+    //render_car(500, 500, 0)
 
-    render_mesh(bull_mesh, 1000, 500, 0)
+    //render_mesh(bull_mesh, 1000, 500, 0)
     render_mesh(bull_mesh, car2.xy.x, car2.xy.y, car2.theta)
     render_mesh(bull_mesh, car.xy.x, car.xy.y, car.theta)
 
