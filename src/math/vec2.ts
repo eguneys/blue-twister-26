@@ -20,6 +20,8 @@ export function sub(a: Vec2,b: Vec2){ return {x: a.x-b.x, y: a.y-b.y}; }
 export function mulScalar(v: Vec2,s: number){ return {x: v.x*s, y: v.y*s}; }
 export function dot(a: Vec2,b: Vec2){ return a.x*b.x + a.y*b.y; }
 
+export function mul(a: Vec2,b: Vec2){ return {x: a.x*b.x, y: a.y*b.y}; }
+
 export function perp(a: Vec2) { return vec2(a.y, - a.x) }
 
 export function project(a: Vec2, target: Vec2) {

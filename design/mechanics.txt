@@ -1,0 +1,26 @@
+minesweeper
+solitaire
+tetris
+sokoban
+snake
+chess
+sudoku
+tangram
+jigsaw
+klotski
+gravity
+avoidance
+timing
+aim/estimate
+match
+order
+merge
+slide
+boulder dash
+cell simulation
+chemistry
+
+
+dominoes
+dice
+monopoly

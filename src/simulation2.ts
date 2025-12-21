@@ -576,7 +576,7 @@ export function hitbox_rect(box: Rect) {
     let w = box.wh.x
     let h = box.wh.y
 
-    batch.strokeRect(x + w / 2, y + h / 2, w, h, 7, colors.red)
+    batch.strokeRect(x + w / 2, y + h / 2, w, h, 1, colors.red)
 }
 
 let batch: BatchRenderer

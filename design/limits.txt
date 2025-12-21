@@ -1,0 +1,13 @@
+no roundness
+no rotation
+no shadows
+no thickness
+
+only rectangles
+
+expressive motion language
+ only 4 directional movement
+expressive particle language
+expressive colors with alpha
+
+layered flat shapes

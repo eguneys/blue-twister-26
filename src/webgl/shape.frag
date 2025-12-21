@@ -86,6 +86,7 @@ void main() {
     if (v_stroke == 0.0) {
         // FILL SHAPE
         float edge = fwidth(d) * 1.2;
+        edge = max(edge, 1.0);
         alpha = 1.0 - smoothstep(0.0, edge, d);
     } else {
         // STROKE SHAPE
@@ -93,6 +94,7 @@ void main() {
         float distToStroke = abs(d) - halfStroke;
     
         float edge = fwidth(distToStroke) * 1.2;
+        edge = max(edge, 1.0);
         alpha = 1.0 - smoothstep(0.0, edge, distToStroke);
     
         //--------------------------------------------------
