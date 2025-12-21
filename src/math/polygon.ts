@@ -1,6 +1,6 @@
 import { rect_abcd, type Rect } from "./rect";
 import type { Penetration } from "./steer";
-import { length, add, dot, mulScalar, normalize, sub, vec2, type Vec2, len2 } from "./vec2";
+import { length, add, dot, mulScalar, normalize, sub, vec2, type Vec2, len2, rotateVec2 } from "./vec2";
 
 export type Poly = {
     points: Vec2[];        // in CCW order, closed implicitly (last -> first)
@@ -15,8 +15,19 @@ export type Poly = {
     }[];
 };
 
-export function poly_from_rect(rect: Rect) {
-    return poly_from_points(rect_abcd(rect))
+export function poly_from_rect(rect: Rect, theta?: number) {
+  let v = rect_abcd(rect)
+  if (theta) {
+    let o = vec2(rect.xy.x + rect.wh.x / 2, rect.xy.y + rect.wh.y / 2)
+    v = v.map(_ => {
+
+      let res = sub(_, o)
+      res = rotateVec2(res, theta)
+      res = add(res, o)
+      return res
+    })
+  }
+  return poly_from_points(v)
 }
 
 export function poly_from_points(inputPoints: Vec2[]): Poly {

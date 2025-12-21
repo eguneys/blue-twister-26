@@ -44,6 +44,7 @@ float applyDash(float distAlongLine, float dash, float gap) {
     return (m < dash) ? 1.0 : 0.0;
 }
 
+
 void main() {
 
     // Normalize local coords to center
@@ -84,29 +85,50 @@ void main() {
 
     if (v_stroke == 0.0) {
         // FILL SHAPE
-        float edge = fwidth(d);
-        edge *= 1.2;
+        float edge = fwidth(d) * 1.2;
         alpha = 1.0 - smoothstep(0.0, edge, d);
-
     } else {
         // STROKE SHAPE
         float halfStroke = v_stroke * 0.5;
         float distToStroke = abs(d) - halfStroke;
-        float edge = fwidth(distToStroke);
-        edge *= 1.2;
+    
+        float edge = fwidth(distToStroke) * 1.2;
         alpha = 1.0 - smoothstep(0.0, edge, distToStroke);
-
+    
         //--------------------------------------------------
-        // DASHING for stroke
+        // DASHING (ANTI-ALIASED, STABLE)
         //--------------------------------------------------
-        if (v_dash.x > 0.0) {
-            // compute distance along primary axis for dash
-            // For rect/roundRect strokes: approximate using x-axis
-            float distAxis = (v_type == 2.0)
-                ? (p.x + v_length * 0.5)
-                : abs(p.x) + abs(p.y);
-
-            float dashMask = applyDash(distAxis, v_dash.x, v_dash.y);
+        if (v_dash.x > 0.0 && alpha > 0.0) {
+    
+            // ---------------------------------------------
+            // Arc-length approximation
+            // ---------------------------------------------
+            float s;
+    
+            if (v_type == 2.0) {
+                // line / rect-like shapes: project along x
+                s = p.x + v_length * 0.5;
+            } else {
+                // fallback: radial distance (better than Manhattan)
+                s = length(p);
+            }
+    
+            // ---------------------------------------------
+            // Dash pattern
+            // ---------------------------------------------
+            float period = v_dash.x + v_dash.y;
+            float phase  = mod(s, period);
+    
+            // derivative-aware AA for dash edges
+            float dashEdge = fwidth(s);
+    
+            float dashMask =
+                1.0 - smoothstep(
+                    v_dash.x - dashEdge,
+                    v_dash.x + dashEdge,
+                    phase
+                );
+    
             alpha *= dashMask;
         }
     }

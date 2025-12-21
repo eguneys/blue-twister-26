@@ -4,6 +4,8 @@ import * as simulate from './simulation2'
 import { audio } from "./simulation2"
 import { Init_canvas } from './webgl/canvas'
 import { DragHandler } from './drag'
+import * as simulate3 from './simulation3'
+import * as simulate4 from './simulation4'
 
 type Scene = {
     _init(): void
@@ -42,7 +44,7 @@ function _init() {
     current_scene = default_scene
     next_scene = current_scene
 
-    switch_to_scene(simulate)
+    switch_to_scene(simulate4)
 }
 
 function _update(delta: number) {
@@ -84,6 +86,9 @@ export async function main(el: HTMLElement) {
     await audio.load()
 
     simulate._set_ctx(batch, drag)
+    simulate3._set_ctx(batch, drag)
+    simulate4._set_ctx(batch, drag)
+
 
     _init()
 

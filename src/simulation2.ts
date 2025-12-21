@@ -244,7 +244,7 @@ export const bull_mesh: Mesh = [
             {
                 A: vec2(-30, -30),
                 B: vec2(-20, 20),
-                thickness: 32
+                thickness: 32 + 2
             },
             {
                 A: vec2(20, -40),
@@ -407,6 +407,7 @@ function render_cursor() {
     batch.fillCircle(cursor.xy.x, cursor.xy.y, 10, colors.black)
 }
 
+// @ts-ignore
 function render_car(x: number, y: number, theta: number) {
 
     let xy = vec2(x, y)
@@ -563,7 +564,7 @@ function render_rect(rect: Rect) {
     batch.strokeRect(rect.xy.x + rect.wh.x / 2, rect.xy.y + rect.wh.y / 2, rect.wh.x, rect.wh.y, 1, colors.yellow)
 }
 
-function render_poly(poly: Poly) {
+export function render_poly(poly: Poly) {
     for (let { A, B } of poly._edges) {
         batch.strokeLine(A.x, A.y, B.x, B.y, 1, colors.yellow)
     }
