@@ -1,5 +1,5 @@
 import { Color } from "./webgl/color"
-import { colors as pico_colors, vibrant as vibrant_colors } from './pico_colors'
+import { invaders as invader_colors, colors as pico_colors, vibrant as vibrant_colors } from './pico_colors'
 
 export const colors: Record<string, Color> = {}
 for (let key of Object.keys(pico_colors)) {
@@ -10,5 +10,12 @@ export const vibrant: Record<string, Color> = {}
 for (let key of Object.keys(vibrant_colors)) {
     vibrant[key] = Color.fromHexString(vibrant_colors[key as keyof typeof vibrant_colors])!
 }
+
+export const invaders: Record<string, Color> = {}
+for (let key of Object.keys(invader_colors)) {
+    invaders[key] = Color.fromHexString(invader_colors[key as keyof typeof invader_colors])!
+}
+
+
 
 

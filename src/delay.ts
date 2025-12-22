@@ -2,7 +2,7 @@
 export class Delay {
 
     private time = 0
-    private next_pop = 0
+    private next_pop = Infinity
     private line: string[] = []
 
     private _action: string = ''
@@ -25,6 +25,8 @@ export class Delay {
             if (this.time >= this.next_pop) {
                 this.next_pop = Infinity
                 this._action = 'end'
+            } else if(this.next_pop < Infinity) {
+                this._action = 'delay'
             } else {
                 this._action = ''
             }
