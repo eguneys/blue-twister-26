@@ -1,9 +1,9 @@
 import { AnimChannel } from "./anim"
-import { colors, vibrant } from "./colors_in_gl"
+import { colors, invaders, vibrant } from "./colors_in_gl"
 import { Delay } from "./delay"
 import type { DragHandler } from "./drag"
 import type { SceneName } from "./main"
-import { arr_rnd } from "./math/random"
+import { hash_i, rnd_float, rnd_int } from "./math/random"
 import { box_intersect_ratio, rect, type Rect } from "./math/rect"
 import { add, distance, mul, mulScalar, vec2, type Vec2 } from "./math/vec2"
 import { hitbox_rect } from "./simulation2"
@@ -34,6 +34,12 @@ class Flash {
 
     static flash = (xy: Vec2, wh: Vec2, delay: number = 50) => {
         Flash.flashes.push(new Flash(xy, wh, delay))
+    }
+
+    static render = () => {
+        for (let flash of Flash.flashes) {
+            draw_flash(flash)
+        }
     }
 
     a: AnimChannel
@@ -89,6 +95,12 @@ class Split {
         }
         if (!omit_dirs.includes('up')) {
             Split.splits.push(new Split(xy, wh, color, iteration, 'up').springX(vec2(0, -wh.y * 1.5)))
+        }
+    }
+
+    static render = () => {
+        for (let split of Split.splits) {
+            draw_split(split)
         }
     }
 
@@ -195,36 +207,70 @@ const color_by_tetro_colors = {
     blue: colors.blue,
 }
 
+const fill_empty_cells = () => {
+    let res = []
+    for (let i = 0; i < 16; i++) {
+        for (let j =0; j < 10; j++) {
+            res.push(vec2(i,j))
+        }
+    }
+    return res
+}
 
 
 class Cell {
 
     static _init() {
-        Cell.cells = fill_cells(175, 200)
+        Cell.empty_cells = fill_empty_cells()
+        Cell.cells = []
         Cell.popped_cells = []
         Cell.fall_cells = []
         Cell.is_dirty = true
-        Cell.delay = new Delay()
+        Cell.delay = new Delay().set_line('500 fall')
+
+
+        //Ice.freeze(vec2(500, 500), vec2(500, 0), 20)
+        //Ice.freeze(vec2(100, 100), vec2(100, 0), 20)
+
+        let xy = Cell.XY
+        let wh = Cell.WH
+        for (let i = 0; i < 16; i++) {
+            for (let j = 0; j < 10; j++) {
+                Ice.freeze(vec2(xy.x + i * wh.x, xy.y + j * wh.y - wh.y / 2), wh, (hash_i([i, j, 8]) % 21 / 20) * 20)
+            }
+        }
+
+    }
+
+    static render() {
+        for (let cell of Cell.cells) {
+            draw_cell(cell)
+        }
+        for (let v of Cell.empty_cells) {
+            draw_empty_cell(v)
+        }
     }
 
     static update(delta: number) {
         if (Cell.is_dirty) {
-            Cell.grid = find_grid_cells()
-            Cell.same_cells = find_same_cells()
-
             Cell.is_dirty = false
         }
 
         if (Cell.delay.action === 'fall') {
+
         }
 
         Cell.delay.update(delta)
     }
 
+    static XY: Vec2 = vec2(100, 200)
+    static WH: Vec2 = vec2(80, 80)
+
     static delay: Delay
 
+    static empty_cells: Vec2[]
+
     static is_dirty: boolean
-    static grid: Cell[][]
     static cells: Cell[]
     static same_cells: Cell[][]
     static popped_cells: Cell[]
@@ -233,8 +279,10 @@ class Cell {
     static Pop_Hover_Timeout = 1000
 
     xy: Vec2
+    wh: Vec2
 
     ij: Vec2
+    kl: Vec2
     tetro_color: TetroColor
 
     a: AnimChannel
@@ -244,9 +292,11 @@ class Cell {
 
     delay: Delay
 
-    constructor(ij: Vec2, xy: Vec2, tetro_color: TetroColor) {
+    constructor(ij: Vec2, kl: Vec2, xy: Vec2, wh: Vec2, tetro_color: TetroColor) {
         this.ij = ij
+        this.kl = kl
         this.xy = xy
+        this.wh = wh
         this.tetro_color = tetro_color
         this.a = new AnimChannel(10)
         this.x = new AnimChannel(xy.x)
@@ -345,85 +395,20 @@ class Cell {
     }
 }
 
-function fill_cells(x: number, y: number) {
-    let res: Cell[] = []
-
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 6; j++) {
-            res.push(new Cell(vec2(i, j), vec2(x + i * 133, y + j * 133), arr_rnd(Tetro_Colors)))
-        }
-    }
-    return res
-}
-
-function find_grid_cells() {
-    let res: Cell[][] = new Array(8)
-
-    for (let i = 0; i < 8; i++) {
-        res[i] = []
-    }
-
-    for (let cell of Cell.cells) {
-        res[cell.ij.x][cell.ij.y] = cell
-    }
-    return res
-}
-
-const vec2_in_bounds = (v: Vec2, a: Vec2) => {
-    if (v.x >= 0 && v.x < a.x && v.y >= 0 && v.y < a.y) {
-        return v
-    }
-}
-
-function find_same_cells() {
-
-    let res: Cell[][] = []
-
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 6; j++) {
-            let cell = Cell.grid[i][j]
-
-            if (res.find(_ => _.find(_ => _ === cell))) {
-                continue
-            }
-
-            let nn = [
-                vec2(i, j + 1),
-                vec2(i, j - 1),
-                vec2(i + 1, j),
-                vec2(i - 1, j),
-            ]
-            nn = nn.filter(_ => vec2_in_bounds(_, vec2(8, 6)))
-
-            let nc = nn.map(_ => Cell.grid[_.x][_.y])
-
-            nc = nc.filter(_ => _.color === cell.color)
-
-            let neighbor = res.find(_ => _.find(_ => nc.includes(_)))
-
-            if (neighbor) {
-                neighbor.push(cell)
-            } else {
-                res.push([cell])
-            }
-        }
-    }
-
-    return res
-}
-
 export function _init() {
 
     cursor = {
         xy: vec2()
     }
 
+    Ice._init()
     Cell._init()
 }
 
 function cell_box(cell: Cell) {
-    let w = 130
-    return rect(cell.xy.x - w / 2, cell.xy.y - w / 2, w, w)
+    let w = cell.wh.x
+    let h = cell.wh.y
+    return rect(cell.xy.x - w / 2, cell.xy.y - h / 2, w, h)
 }
 
 let cursor_box: Rect
@@ -487,6 +472,9 @@ export function _update(delta: number) {
         flash.update(delta)
     }
 
+    for (let ice of Ice.ices) {
+        ice.update(delta)
+    }
 
     drag.update(delta)
 }
@@ -496,21 +484,10 @@ export function _render() {
     batch.beginFrame()
     batch.fillRect(1920/2, 1080/2, 1920, 1080, vibrant.darkblue)
 
-
-
-    for (let cell of Cell.cells) {
-        draw_cell(cell)
-    }
-
-    for (let split of Split.splits) {
-        draw_split(split)
-    }
-
-    for (let flash of Flash.flashes) {
-        draw_flash(flash)
-    }
-
-
+    Cell.render()
+    Split.render()
+    Flash.render()
+    Ice.render()
 
     let x = cursor.xy.x
     let y = cursor.xy.y
@@ -521,6 +498,81 @@ export function _render() {
 
     batch.endFrame()
 
+}
+
+class Ice {
+
+    static ices: Ice[]
+
+    static _init = () => {
+        Ice.ices = []
+    }
+
+    static freeze = (xy: Vec2, wh: Vec2, gaps: number) => {
+        Ice.ices.push(new Ice(xy, wh, gaps))
+    }
+
+    static render = () => {
+        for (let ice of Ice.ices) {
+            draw_ice(ice)
+        }
+    }
+
+    xy: Vec2
+    wh: Vec2
+
+    nb_gaps: number[]
+    nb2_sicles: AnimChannel[]
+    delay: Delay
+
+    constructor(xy: Vec2, wh: Vec2, gaps: number) {
+        this.xy = xy
+        this.wh = wh
+        this.nb_gaps = []
+        this.nb2_sicles = []
+
+        let budget = this.wh.x
+        for (let i = 0; i < gaps; i++) {
+            let gap = budget * 0.1 + rnd_int(0, 10)
+            budget -= gap
+            if (budget < 0) {
+                break
+            }
+            this.nb_gaps[i] = gap
+            this.nb2_sicles[i * 2] = new AnimChannel()
+            this.nb2_sicles[i * 2 + 1] = new AnimChannel()
+        }
+
+        this.delay = new Delay().set_line('1000 lick')
+    }
+
+    update(delta: number) {
+        this.delay.update(delta)
+
+        for (let sicle of this.nb2_sicles) {
+            sicle.update(delta / 1000)
+        }
+
+        if (this.delay.action === 'lick') {
+            for (let i = 0; i < this.nb2_sicles.length; i++) {
+                this.nb2_sicles[i].springTo(rnd_float(0, 30), Slow_Spring)
+            }
+        }
+
+    }
+
+}
+
+
+// Liquid Ice
+function draw_empty_cell(v: Vec2) {
+
+    let x = Cell.XY.x
+    let y = Cell.XY.y
+    let w = Cell.WH.x
+    let h = Cell.WH.y
+
+    batch.strokeRect(x + v.x * w, y + v.y * h, w, h, 1, invaders.sand1)
 }
 
 function draw_flash(flash: Flash) {
@@ -538,6 +590,21 @@ function draw_split(split: Split) {
     batch.fillRect(xy.x, xy.y, wh.x, wh.y, color)
 }
 
+function draw_ice(ice: Ice) {
+    let xy = ice.xy
+    let wh = ice.wh
+    let color = colors.white
+
+    batch.fillRect(xy.x, xy.y, wh.x, 1, vibrant.white)
+
+    let off = 0
+    let i = 0
+    for (let sicle of ice.nb2_sicles) {
+        off += ice.nb_gaps[i++]
+        batch.fillRect(off + xy.x - wh.x / 2, xy.y + sicle.value / 2, 2, sicle.value, color)
+    }
+}
+
 function render_debug() {
     if (collisions) {
         hitbox_rect(cursor_box)
@@ -552,11 +619,14 @@ function draw_cell(cell: Cell) {
     let x = cell.xy.x
     let y = cell.xy.y
 
+    let w = cell.wh.x
+    let h = cell.wh.y
+
     let a = cell.a.value
     let color = cell.color
 
-    batch.strokeRect(x, y, 130, 130, 1, vibrant.black)
-    batch.fillRect(x, y, 130 - a, 130 - a, color)
+    batch.strokeRect(x, y, w, h, 1, vibrant.black)
+    batch.fillRect(x, y, w - a, h - a, color)
 }
 
 

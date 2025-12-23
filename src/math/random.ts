@@ -60,3 +60,17 @@ export function arr_shuffle<A>(array: Array<A>) {
   return array
 }
 
+
+
+export const hash_i = (v: number[]) => {
+    let value = 1
+    for (let a of v) {
+        value += (a + 1)
+        value *= (a + 1)
+        value += (a + 1)
+        value *= (a + 1)
+        value *= Math.sin(a * 1)
+    }
+
+    return value
+}
