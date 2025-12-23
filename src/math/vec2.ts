@@ -3,6 +3,7 @@ export type Vec2 = { x: number, y: number }
 export function len2(a: Vec2) { return a.x * a.x + a.y * a.y; }
 export function length(a: Vec2) { return Math.hypot(a.x, a.y); }
 export function distance(a: Vec2, b: Vec2) { return length(sub(a, b)); }
+export function distance2(a: Vec2, b: Vec2) { return len2(sub(a, b)); }
 export function normalize(a: Vec2) { const l = length(a); return { x: a.x / l, y: a.y / l };  }
 
 export function normalizeSafe(v: Vec2): Vec2 {

@@ -5,7 +5,8 @@ import type { DragHandler } from "./drag"
 import type { SceneName } from "./main"
 import { hash_i, rnd_float, rnd_int } from "./math/random"
 import { box_intersect_ratio, rect, type Rect } from "./math/rect"
-import { add, distance, mul, mulScalar, vec2, type Vec2 } from "./math/vec2"
+import { agent, FlightAvoidance, Seek, update_agent, Wander, type Agent, type SteeringBehavior } from "./math/steer"
+import { length, add, distance, mul, mulScalar, vec2, type Vec2, distance2 } from "./math/vec2"
 import { hitbox_rect } from "./simulation2"
 import type { BatchRenderer } from "./webgl/BatchRenderer"
 import { Color } from "./webgl/color"
@@ -15,16 +16,20 @@ let collisions = false
 
 type Cursor = {
     xy: Vec2
+    lag_x: AnimChannel
+    lag_y: AnimChannel
 
     hover_cell?: Cell
 }
 
 let cursor: Cursor
 
-//const Very_High_Spring = { stiffness: 2800, damping: 0 }
+// @ts-ignore
+const Very_High_Spring = { stiffness: 2800, damping: 10 }
 const High_Spring = { stiffness: 800, damping: 10 }
 const Low_Spring = { stiffness: 800, damping: 60 }
 
+const Very_Fast_Spring = { stiffness: 1800, damping: 35 }
 const Fast_Spring = { stiffness: 1800, damping: 80 }
 const Slow_Spring = { stiffness: 400, damping: 60 }
 
@@ -39,6 +44,12 @@ class Flash {
     static render = () => {
         for (let flash of Flash.flashes) {
             draw_flash(flash)
+        }
+    }
+
+    static update = (delta: number) => {
+        for (let flash of Flash.flashes) {
+            flash.update(delta)
         }
     }
 
@@ -101,6 +112,12 @@ class Split {
     static render = () => {
         for (let split of Split.splits) {
             draw_split(split)
+        }
+    }
+
+    static update = (delta: number) => {
+        for (let split of Split.splits) {
+            split.update(delta)
         }
     }
 
@@ -198,6 +215,7 @@ class Split {
 
 type TetroColor = 'yellow' | 'red' | 'green' | 'blue'
 
+// @ts-ignore
 const Tetro_Colors: TetroColor[] = ['yellow', 'red', 'green', 'blue']
 
 const color_by_tetro_colors = {
@@ -239,7 +257,6 @@ class Cell {
                 Ice.freeze(vec2(xy.x + i * wh.x, xy.y + j * wh.y - wh.y / 2), wh, (hash_i([i, j, 8]) % 21 / 20) * 20)
             }
         }
-
     }
 
     static render() {
@@ -261,6 +278,10 @@ class Cell {
         }
 
         Cell.delay.update(delta)
+
+        for (let cell of Cell.cells) {
+            cell.update(delta)
+        }
     }
 
     static XY: Vec2 = vec2(100, 200)
@@ -398,9 +419,12 @@ class Cell {
 export function _init() {
 
     cursor = {
-        xy: vec2()
+        xy: vec2(),
+        lag_x: new AnimChannel(),
+        lag_y: new AnimChannel()
     }
 
+    Snow._init()
     Ice._init()
     Cell._init()
 }
@@ -415,9 +439,14 @@ let cursor_box: Rect
 
 export function _update(delta: number) {
 
-    Cell.update(delta)
 
     cursor.xy = vec2(drag.is_hovering[0], drag.is_hovering[1])
+
+    cursor.lag_x.springTo(cursor.xy.x, Very_Fast_Spring)
+    cursor.lag_y.springTo(cursor.xy.y, Very_Fast_Spring)
+
+    cursor.lag_x.update(delta / 1000)
+    cursor.lag_y.update(delta / 1000)
 
     cursor_box = rect(cursor.xy.x - 16, cursor.xy.y - 16, 32, 32)
 
@@ -460,21 +489,11 @@ export function _update(delta: number) {
         }
     }
 
-    for (let cell of Cell.cells) {
-        cell.update(delta)
-    }
-
-    for (let split of Split.splits) {
-        split.update(delta)
-    }
-
-    for (let flash of Flash.flashes) {
-        flash.update(delta)
-    }
-
-    for (let ice of Ice.ices) {
-        ice.update(delta)
-    }
+    Cell.update(delta)
+    Split.update(delta)
+    Flash.update(delta)
+    Ice.update(delta)
+    Snow.update(delta)
 
     drag.update(delta)
 }
@@ -484,19 +503,213 @@ export function _render() {
     batch.beginFrame()
     batch.fillRect(1920/2, 1080/2, 1920, 1080, vibrant.darkblue)
 
+    let cursor_x = cursor.lag_x.value
+    let cursor_y = cursor.lag_y.value
+
+    batch.fillRect(cursor_x, cursor_y, 80, 60, colors.blue, Math.PI * 0.25)
+
+    batch.pushMask()
+
+    batch.fillRect(cursor_x, cursor_y, 100, 100, colors.white, Math.PI * 0.25)
+    batch.endMask()
+
+    Snow.render()
+    batch.popMask()
+
+
+    batch.pushMask()
+
+    batch.fillRect(500, 1080/2, 1920, 1080, colors.white)
+    batch.endMask()
+    batch.popMask()
+
+
     Cell.render()
     Split.render()
     Flash.render()
     Ice.render()
 
-    let x = cursor.xy.x
-    let y = cursor.xy.y
+    cursor_x = cursor.xy.x
+    cursor_y = cursor.xy.y
 
-    batch.fillRect(x, y, 20, 20, vibrant.white, Math.PI * 0.25)
+    batch.fillRect(cursor_x, cursor_y, 20, 20, vibrant.white, Math.PI * 0.25)
 
     render_debug()
 
     batch.endFrame()
+
+}
+
+
+class Snow {
+
+    static Snows: Snow[]
+    static Delay: Delay
+
+    static Wind: AnimChannel[]
+    static WindDelay: Delay
+
+    static _init = () => {
+        Snow.Snows = []
+        Snow.Delay = new Delay().set_line('200')
+        Snow.WindDelay = new Delay().set_line('200')
+        Snow.Wind = [
+            new AnimChannel(),
+            new AnimChannel(),
+            new AnimChannel(),
+            new AnimChannel(),
+        ]
+    }
+
+    static push = (xy: Vec2, wh: Vec2, color: Color) => {
+        Snow.Snows.push(new Snow(xy, wh, color))
+    }
+
+    static render = () => {
+        for (let snow of Snow.Snows) {
+            if (distance2(cursor.xy, snow.xy) > 100 * 100) {
+                continue
+            } 
+            draw_snow(snow)
+        }
+
+        draw_snow_line()
+    }
+
+    static update = (delta: number) => {
+        Snow.Delay.update(delta)
+
+        if (Snow.Delay.action === 'end') {
+            let fall = rnd_int(200, 800)
+            Snow.Delay.set_line(`${fall}`)
+
+
+            for (let i = -500 / 30; i < (1920 + 500) / 30; i++) {
+                Snow.push(vec2(i * 30 + rnd_int(-10, 10), rnd_int(-10, -30)), vec2(rnd_int(3, 6), rnd_int(3, 5)), colors.white)
+            }
+        }
+
+        for (let snow of Snow.Snows) {
+            snow.update(delta)
+        }
+
+
+        Snow.WindDelay.update(delta)
+
+        if (Snow.WindDelay.action === 'end') {
+            let wind = rnd_int(1000, 4000)
+            Snow.WindDelay.set_line(`${wind}`)
+
+            for (let Wind of Snow.Wind)
+                Wind.springTo(rnd_int(-5000, 5000), { stiffness: 100, damping: 100 })
+
+        }
+
+        for (let Wind of Snow.Wind)
+            Wind.update(delta / 1000)
+
+
+        Snow.cursor_flight_update(delta)
+    }
+
+
+    xy: Vec2
+    wh: Vec2
+
+    color: Color
+
+    get depth_color() {
+        if (Math.abs(this.agent.velocity.x) > 0.1) {
+            return invaders.blue4
+        } else if (Math.abs(this.agent.velocity.x) > 0.08) {
+            return invaders.blue1
+        } else {
+            if (this.agent.velocity.x < 0) {
+
+                return vibrant.white
+            } else {
+                return this.color
+            }
+        }
+    }
+
+    delay: Delay
+
+    agent: Agent
+    behaviors: SteeringBehavior[]
+
+    wind_x: number
+
+    constructor(xy: Vec2, wh: Vec2, color: Color) {
+        this.xy = xy
+        this.wh = wh
+        this.color = color
+
+        this.delay = new Delay()
+
+        this.agent = agent(xy, {
+            radius: this.wh.x,
+            mass: ((length(this.wh) / 10) + rnd_float(0, 0.3)) * 0.0001,
+            maxSpeed: .2,
+            maxForce: .2,
+            turnRate: 0
+        })
+
+        const fall_down_target = () => add(xy, vec2(0, 1080))
+        const wind_target = () => {
+            return add(xy, vec2(this.wind_x + Snow.Wind[Math.abs(Math.floor(hash_i([Math.floor(xy.x / 50), Math.floor((xy.y - 50) / 50)]))) % Snow.Wind.length]?.value, 1080))
+        }
+
+        this.behaviors = [
+            new Seek(1, .8, fall_down_target),
+            new Wander(1, .9, 100, 100),
+            new Seek(2, .8, wind_target)
+        ]
+
+        this.wind_x = 0
+
+        this.delay.set_line('500 wind')
+    }
+
+    static FlightCursor = new FlightAvoidance(20, () => [{position: cursor.xy, radius: 10 }], 80, 100, .6)
+    static Is_Cursor_Flight = false
+
+    static Cursor_Flight_Delay = new Delay()
+
+    static cursor_flight_update = (delta: number) => {
+
+        Snow.Cursor_Flight_Delay.update(delta)
+
+        if (Snow.Cursor_Flight_Delay.action === 'end') {
+            Snow.Is_Cursor_Flight = false
+        }
+
+        if (drag.is_just_down) {
+            Snow.Is_Cursor_Flight = true
+            Snow.Cursor_Flight_Delay.set_line('500')
+        }
+    }
+
+    update(delta: number) {
+        this.delay.update(delta)
+        let behaviors = [
+            ...this.behaviors,
+            ...Snow.Is_Cursor_Flight ? [Snow.FlightCursor] : []
+        ]
+        update_agent(this.agent, behaviors, [], delta)
+
+        this.xy = this.agent.position
+
+        if (this.delay.action === 'wind') {
+            let wind = rnd_int(300, 2500)
+            this.delay.set_line(`${wind} wind`)
+            this.wind_x = rnd_int(-1500, 1500)
+        }
+
+        if (this.xy.y > 1000) {
+            Snow.Snows.splice(Snow.Snows.indexOf(this), 1)
+        }
+    }
 
 }
 
@@ -516,6 +729,14 @@ class Ice {
         for (let ice of Ice.ices) {
             draw_ice(ice)
         }
+    }
+
+    static update = (delta: number) => {
+    for (let ice of Ice.ices) {
+        ice.update(delta)
+    }
+
+
     }
 
     xy: Vec2
@@ -563,6 +784,15 @@ class Ice {
 
 }
 
+function draw_snow_line() {
+    batch.fillRect(1920/2, 1000, 1920, 1, colors.white)
+    batch.fillRect(100, 1000 + 1, 300, 1, colors.white)
+    batch.fillRect(500, 1000 + 1, 300, 1, colors.white)
+    batch.fillRect(1000, 1000 + 1, 300, 1, colors.white)
+    batch.fillRect(400, 1000 - 1, 300, 1, colors.white)
+    batch.fillRect(800, 1000 - 1, 300, 1, colors.white)
+    batch.fillRect(1300, 1000 - 1, 330, 1, colors.white)
+}
 
 // Liquid Ice
 function draw_empty_cell(v: Vec2) {
@@ -604,6 +834,16 @@ function draw_ice(ice: Ice) {
         batch.fillRect(off + xy.x - wh.x / 2, xy.y + sicle.value / 2, 2, sicle.value, color)
     }
 }
+
+function draw_snow(snow: Snow) {
+    let xy = snow.xy
+    let wh = snow.wh
+    let color = snow.depth_color
+
+    batch.fillRect(xy.x, xy.y, wh.x, wh.y, color)
+}
+
+
 
 function render_debug() {
     if (collisions) {

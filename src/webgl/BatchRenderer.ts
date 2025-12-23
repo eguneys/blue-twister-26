@@ -47,6 +47,21 @@ export class BatchRenderer {
     this.flush();
   }
 
+  pushMask() {
+    this.flush()
+    this.renderer.pushMask()
+  }
+
+  popMask() {
+    this.flush()
+    this.renderer.popMask()
+  }
+
+  endMask() {
+    this.flush()
+    this.renderer.endMask()
+  }
+
   private ensureCapacity(additional: number) {
     if (this.cursor + additional > this.maxInstances) {
       // flush existing data and continue

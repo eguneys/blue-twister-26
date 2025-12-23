@@ -18,8 +18,10 @@ export class Renderer {
     //uResolution: WebGLUniformLocation | null;
     uProjectionMatrix: WebGLUniformLocation | null;
 
+    maskDepth = 0
+
     constructor(canvas: HTMLCanvasElement, maxInstances = 10_000) {
-        const gl = canvas.getContext("webgl2", { antialias: true });
+        const gl = canvas.getContext("webgl2", { antialias: true, stencil: true });
         if (!gl) throw new Error("WebGL2 not supported");
         this.gl = gl;
 
@@ -49,8 +51,42 @@ export class Renderer {
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     }
 
+
     set_viewport(w: number, h: number) {
         this.gl.viewport(0, 0, w, h)
+    }
+
+    pushMask() {
+        const gl = this.gl
+        gl.enable(gl.STENCIL_TEST)
+
+        gl.colorMask(false, false, false, false)
+
+        gl.stencilFunc(gl.ALWAYS, this.maskDepth + 1, 0xFF)
+        gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE)
+    }
+
+
+    endMask() {
+        const gl = this.gl
+        gl.colorMask(true, true, true, true)
+
+        this.maskDepth++
+
+        gl.stencilFunc(gl.EQUAL, this.maskDepth, 0xFF)
+        gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP)
+    }
+
+    popMask() {
+        this.maskDepth--
+
+        const gl = this.gl
+
+        if (this.maskDepth > 0) {
+            gl.stencilFunc(gl.EQUAL, this.maskDepth, 0xFF)
+        } else {
+            gl.disable(gl.STENCIL_TEST)
+        }
     }
 
         private createVAO(): WebGLVertexArrayObject {
@@ -136,7 +172,6 @@ export class Renderer {
         gl.useProgram(this.program);
         gl.bindVertexArray(this.vao);
 
-        //gl.uniform2f(this.uResolution, gl.canvas.width, gl.canvas.height);
         gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
 
         // Upload only the needed part of the buffer
