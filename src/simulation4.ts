@@ -1,15 +1,7 @@
-import { AnimChannel } from "./anim"
-import { colors, invaders, vibrant } from "./colors_in_gl"
-import { Delay } from "./delay"
-import type { DragHandler } from "./drag"
+import { length, add, agent, AnimChannel, box_intersect_ratio, Color, colors, Delay, distance, distance2, invaders, mul, mulScalar, rect, vec2, vibrant, type Agent, type Rect, type SteeringBehavior, type Vec2, Seek, Wander, FlightAvoidance, update_agent, BatchRenderer, DragHandler } from "twisterjs"
 import type { SceneName } from "./main"
 import { hash_i, rnd_float, rnd_int } from "./math/random"
-import { box_intersect_ratio, rect, type Rect } from "./math/rect"
-import { agent, FlightAvoidance, Seek, update_agent, Wander, type Agent, type SteeringBehavior } from "./math/steer"
-import { length, add, distance, mul, mulScalar, vec2, type Vec2, distance2 } from "./math/vec2"
 import { hitbox_rect } from "./simulation2"
-import type { BatchRenderer } from "./webgl/BatchRenderer"
-import { Color } from "./webgl/color"
 
 let collisions = false
 //collisions = true

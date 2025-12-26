@@ -1,11 +1,6 @@
 import './style.css'
-import { Loop } from "./loop"
-import * as simulate from './simulation2'
-import { audio } from "./simulation2"
-import { Init_canvas } from './webgl/canvas'
-import { DragHandler } from './drag'
-import * as simulate3 from './simulation3'
 import * as simulate4 from './simulation4'
+import { DragHandler, Init_canvas, Loop } from 'twisterjs'
 
 type Scene = {
     _init(): void
@@ -33,7 +28,7 @@ function switch_to_scene(scene: Scene) {
 }
 
 let Scenes: Record<string, Scene> = {
-    'simulate': simulate
+    'simulate': simulate4
 } as const
 
 export type SceneName = keyof typeof Scenes;
@@ -79,14 +74,12 @@ function _cleanup() {
 
 export async function main(el: HTMLElement) {
 
-    let { batch, canvas } = Init_canvas(el, _render)
+    let { batch, canvas } = Init_canvas(1920, 1080, el, _render)
 
-    let drag = DragHandler(canvas)
+    let drag = DragHandler(1920, 1080, canvas)
 
-    await audio.load()
+    //await audio.load()
 
-    simulate._set_ctx(batch, drag)
-    simulate3._set_ctx(batch, drag)
     simulate4._set_ctx(batch, drag)
 
 
